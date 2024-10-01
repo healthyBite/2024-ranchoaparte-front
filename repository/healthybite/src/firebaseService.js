@@ -95,6 +95,7 @@ export const fetchAllFoods = async () => {
 
 export const addUserFood = async (selection, date, amount) => {
     try {
+        console.log(selection)
         const response = await fetch("https://two024-ranchoaparte-back.onrender.com/UserFood_log", {
             method: "POST",
             headers: {
@@ -289,18 +290,53 @@ export const fetchTotCalByDay = async (date) => {
     console.log("Filtered User cals by date:", filteredTotcal);
     return filteredTotcal;
 };
+
+export const getCaloriesByCategories=async (date)=>{
+    try{
+        const userMeals= (await fetchUserFoods(date))
+        const foods= await  fetchAllFoods()
+        const categories = (await getCategories()).concat(await getDefaultCategories());
+        const result=[]
+        // food consumed with its calories counted
+        userMeals.forEach((item)=>{
+            const fooddetail=(foods.find((food)=>food.id===item.id_Food))
+            const calories={
+                id_Food: item.id_Food,
+                calories: Number((item.amount_eaten*fooddetail.calories_portion)/fooddetail.measure_portion)
+            }
+            result.push(calories)
+        })
+        const totalCal = result.reduce((acc,value)=>acc+value.calories, 0) 
+        // divide calories by categories
+        const getCalories=[]
+        categories.forEach((cat)=>{
+            let cals=0
+            result.filter(food=>cat.foods.includes(food.id_Food)).forEach((item)=>{
+                cals+=Number(item.calories)
+            })
+            getCalories.push({label:cat.name, value:cals})
+        })
+        const caloriesInCat = getCalories.reduce((acc,value)=>acc+value.value, 0) 
+        caloriesInCat<totalCal && getCalories.push({label:'Others',value:totalCal-caloriesInCat})
+
+        return getCalories
+    }catch(error){
+        console.log('Error fetching calories by categories: ', error)
+    }
+}
+
 export const getTotCalUser=async()=>{
     const uid=auth.currentUser.uid
-    try {
+    if(uid){try {
+        console.log(uid)
         const response = await axios.get(`https://two024-ranchoaparte-back.onrender.com/GetTotCalUser/${uid}`);
         return response.data.message.totCals; // Adjust this based on your backend response structure
     } catch (error) {
         console.error('Error fetching categories :', error);
         return null; // Return null or handle the error as needed
+    }}else{
+        console.log('no se encuentra el usuario')
     }
-
-
-
 }
 
 export const resetPassword = async (oobCode, newPassword) => {
@@ -314,4 +350,20 @@ export const resetPassword = async (oobCode, newPassword) => {
     }
 };
 
+// APP MESIIDEPAUL
 
+export const getProducts=async()=>{
+    const response = await axios.get('https://two024-messidepaul-back.onrender.com/products');
+    const foods=response.data.products
+    return foods;
+}
+
+export const editCalories=async(id,calories)=>{
+    await axios.put(`https://two024-messidepaul-back.onrender.com/add-calories/${id}/${calories}`); 
+
+}
+export const getProdByID= async(prod_id)=>{
+    const response = await axios.get(`https://two024-messidepaul-back.onrender.com/products/${prod_id}`);
+    const food=response.data.product
+    return food
+}
