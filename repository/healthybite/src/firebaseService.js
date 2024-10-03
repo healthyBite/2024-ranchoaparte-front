@@ -184,16 +184,35 @@ export const getCategories = async()=>{
     }
 }
 
-export const getDefaultCategories = async()=>{
-    const uid=auth.currentUser.uid
+export const getDefaultCategories = async () => {
+    const uid = auth.currentUser.uid;
     try {
         const response = await axios.get(`https://two024-ranchoaparte-back.onrender.com/GetCategoryUser/default`);
         return response.data.message.categories; // Adjust this based on your backend response structure
     } catch (error) {
-        console.error('Error fetching default categories :', error);
+        console.error('Error fetching default categories:', error);
         return null; // Return null or handle the error as needed
     }
-}
+};
+
+export const getBarCategory = async () => {
+    try {
+        const defaultCategories = await getDefaultCategories();
+        console.log('Default Categories:', defaultCategories); // Log all categories
+
+        if (defaultCategories) {
+            const barCategory = defaultCategories.find(cat => cat.name === "C&V bar");
+            console.log('Found Bar Category:', barCategory); // Log if the category is found
+            return barCategory ? barCategory : null; // Return the category or null if not found
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching bar category:', error);
+        return null; // Return null or handle the error as needed
+    }
+};
+
+
 
 export const createCategory =async (data)=>{
     const uid=auth.currentUser.uid
@@ -209,6 +228,15 @@ export const createCategory =async (data)=>{
 export const updateCategory=async(data,category_id)=>{
     try{
         const response = await axios.put(`https://two024-ranchoaparte-back.onrender.com/UpdateCategory/${category_id}`,{...data,id_User: auth.currentUser.uid });
+        return response.data
+    }catch(error){
+        console.error('Error updating category by id: ', error);
+        return null;
+    }
+}
+export const updateCategoryDefault=async(data,category_id)=>{
+    try{
+        const response = await axios.put(`https://two024-ranchoaparte-back.onrender.com/UpdateCategory/${category_id}`,{...data,id_User: 'default' });
         return response.data
     }catch(error){
         console.error('Error updating category by id: ', error);
@@ -294,16 +322,27 @@ export const fetchTotCalByDay = async (date) => {
 export const getCaloriesByCategories=async (date)=>{
     try{
         const userMeals= (await fetchUserFoods(date))
+        const barFood= await getProducts();
         const foods= await  fetchAllFoods()
         const categories = (await getCategories()).concat(await getDefaultCategories());
         const result=[]
         // food consumed with its calories counted
         userMeals.forEach((item)=>{
-            const fooddetail=(foods.find((food)=>food.id===item.id_Food))
-            const calories={
-                id_Food: item.id_Food,
-                calories: Number((item.amount_eaten*fooddetail.calories_portion)/fooddetail.measure_portion)
+            let calories
+            let fooddetail=(foods.find((food)=>food.id===item.id_Food))
+            if(fooddetail){
+                calories={
+                    id_Food: item.id_Food,
+                    calories: Number((item.amount_eaten*fooddetail.calories_portion)/fooddetail.measure_portion)
+                }
+            }else{ //that food is i C&V menu
+                fooddetail = barFood.find((food)=>food.id===item.id_Food)
+                calories={
+                    id_Food: item.id_Food,
+                    calories: Number(item.amount_eaten*fooddetail.calories)
+                }
             }
+
             result.push(calories)
         })
         const totalCal = result.reduce((acc,value)=>acc+value.calories, 0) 

@@ -7,7 +7,7 @@ import NavBar from "../../components/NavBar";
 import Calories from "./components/Calories";
 import FoodConsumed from "./components/FoodConsumed";
 import PopUp from "./components/PopUp";
-import { addNewFood, addUserFood, fetchAllFoods, fetchUserFoods, deleteUserFood , fetchFoodByID, editUserFood, getCategories, getDefaultCategories,getProdByID} from "../../firebaseService";
+import { addNewFood, addUserFood, fetchAllFoods, fetchUserFoods, deleteUserFood , fetchFoodByID, editUserFood, getCategories, getDefaultCategories,getProdByID, getProducts,getBarCategory,updateCategoryDefault} from "../../firebaseService";
 import Filter from "./components/Filter";
 
 function Home() {
@@ -25,15 +25,40 @@ function Home() {
 
     useEffect(()=>{
         if(filterSelected) {
-            console.log("Quiero veer las comidas ---> ", filteredFood)
-            console.log('FILTROOOO --> ', filterSelected)
             const aplyingFilter=filteredFood.filter((item)=>filterSelected.foods.includes(item.id_Food))
             setFilteredFood(aplyingFilter)
-            console.log("Aplicando el filtro: ", aplyingFilter)
         }else{
             setFilteredFood(userFood)
         }
     },[filterSelected])
+    const handleChangesCat = async () => {
+        try {
+            // Get the foods and bar category
+            const barFoods = await getProducts(); // Assuming this returns a list of foods
+            const BarCat = await getBarCategory(); // Assuming this returns a category object
+            
+            if (!BarCat) {
+                throw new Error('Bar category not found');
+            }
+    
+            // Filter barFoods to include only the items that are not in BarCat.foods
+            const filteredFoods = barFoods.filter(food => !BarCat.foods.includes(food.id)); // Assuming food.id is the unique identifier
+    
+            // Prepare the data for the update
+            const data = {
+                name: BarCat.name,
+                id_User: 'default', 
+                icon: BarCat.icon, // Fixed this to use BarCat.icon (instead of BarCat.name for both)
+                foods: [...BarCat.foods, ...filteredFoods.map(food => food.id)] // Combine existing foods and new filtered foods
+            };
+
+            await updateCategoryDefault(data, BarCat.id);    
+            console.log("Category updated successfully");
+        } catch (error) {
+            console.error("Error saving category changes by ID:", error);
+        }
+    };
+    
 
     const fetchFoods = async () => {
         const loadData = async () => {
@@ -42,11 +67,10 @@ function Home() {
                 if (isNaN(new Date(date).getTime())) {
                     throw new Error('Invalid date value');
                 }
-    
-                // Fetch user foods and all foods
                 const userFood = await fetchUserFoods(date);
                 const food = await fetchAllFoods();
                 setFoodData(food);
+                
     
                 // Fetch food details for each user food using Promise.all
                 const userFoodDetails = await Promise.all(userFood.map(async (item) => {
@@ -92,6 +116,7 @@ function Home() {
         try {
             const cats = await getCategories();
             const defaultCats= await getDefaultCategories();
+            await handleChangesCat()
             setCategories(defaultCats.concat(cats));
         } catch (err) {
             console.log('Error al obtener las categorias: ' + err);
@@ -163,9 +188,9 @@ function Home() {
         <div className="h-screen w-full ">
             <NavBar />
             <div className="flex flex-col lg:flex-row justify-between items-center w-full lg:h-screen">
-                <div className="w-full sm:w-11/12 lg:w-9/12 sm:h-screen lg:h-full pt-8 sm:pt-24 flex flex-col sm:flex-row justify-start items-start px-8">
-                    <div className="sticky top-0 w-full sm:w-1/4 pb-4 sm:pb-12 flex flex-col h-full justify-start sm:justify-between items-center">
-                        <div className="flex flex-col justify-center items-center md:items-start w-4/5  sm:w-1/3 md:w-full " >
+                <div className="w-full sm:w-11/12 lg:w-9/12 sm:h-screen lg:h-full pt-8 sm:pt-24 flex flex-col sm:flex-row justify-start items-start px-1 sm:px-4 lg:px-8">
+                    <div className="w-full sm:w-1/4 pb-4 sm:pb-12 flex flex-col h-full justify-start sm:justify-between items-center">
+                        <div className="flex flex-col justify-center items-center md:items-start w-4/5  sm:w-full " >
                             <Calendar value={date} onChange={e => selectDate(e)} />
                             <Filter categories={categories} filterSelected={filterSelected} setFilterSelected={setFilterSelected} />
                         </div>
