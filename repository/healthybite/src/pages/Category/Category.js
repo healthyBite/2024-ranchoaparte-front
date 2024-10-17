@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { createContext, useEffect, useState } from "react";
 import NavBar from '../../components/NavBar'
 import categoryImg from '../../assets/categoryBg.jpg'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faIceCream, faTrash, faPen, faPlus} from '@fortawesome/free-solid-svg-icons'; 
 import CategoryItem from './components/CategoryItem';
 import NewCategory from './components/NewCategory';
-import { fetchAllFoods, getCategories, getProducts} from "../../firebaseService";
+import { fetchAllFoods, getCategories, getProducts, getUserDrinks,getUserPlates} from "../../firebaseService";
 import PopUpCat from "./components/PopUpCat";
 import { auth } from "../../firebaseConfig";
 import Loading from "../../components/Loading";
@@ -40,7 +40,16 @@ function Category() {
         try{
             const food = await fetchAllFoods()
             const barFood=await getProducts()
-            setFoodData(food.concat(barFood.map((item)=>({...item, bar:true}))))
+            const drinks = await getUserDrinks()
+            const plates = await getUserPlates()
+            const combinedFoodData = [
+                ...food, 
+                ...barFood.map((item) => ({ ...item, bar: true })),
+                ...drinks.map((item) => ({ ...item, drink: true })),
+                ...plates.map((item) => ({ ...item, plate: true }))
+            ];
+    
+            setFoodData(combinedFoodData)
         }catch(error){
             console.log("Error fetching foods in Category page: ", error)
         }
@@ -57,11 +66,12 @@ function Category() {
 
 
   return (
-    <><div className={`h-screen w-full ${ addFood && 'overflow-y-hidden'}`}>
+    <>
+    <div className={`h-screen w-full overflow-y-hidden`}>
         <NavBar/>
         {loading ?
             <Loading />
-        :<div className='w-full flex flex-row items-start justify-between h-screen'>
+        :<div className='w-full flex flex-row items-start justify-between h-screen overflow-y-auto md:overflow-y-hidden'>
             {window.innerWidth > 768  && 
             <div className='w-1/4 lg:w-1/3 overflow-hidden  h-screen  flex items-center justify-start'>
                 <img src={categoryImg} alt="Category image background"  className=' w-full h-full object-cover'/>

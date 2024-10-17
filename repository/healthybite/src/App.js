@@ -8,6 +8,8 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import UserProfile from './pages/UserProfile/UserProfile';
 import Category from './pages/Category/Category';
 import Dashboard from './pages/Dashboard/Dashboard';
+import { Plates } from './pages/Plates/Plates';
+import { Drinks } from './pages/Drinks/Drinks';
 
 function App() {
   const [user]= useAuthState(auth)
@@ -15,10 +17,13 @@ function App() {
     <Router>
         <Routes>
           <Route path="/" element={ user ? <Home /> : <Login />} />
+          <Route path="/plates" element={<Plates/>}/>
+          <Route path="/drinks" element={<Drinks/>}/>
           <Route path="/user-profile" element={<UserProfile />} />
           <Route path="/resetPassword" element={<ResetPassword />} />
           <Route path="/category" element={<Category/>} />
           <Route path="/dashboard" element={<Dashboard />} />
+          
         </Routes>
       </Router>
 

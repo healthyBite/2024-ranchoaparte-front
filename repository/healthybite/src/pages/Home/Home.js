@@ -7,13 +7,15 @@ import NavBar from "../../components/NavBar";
 import Calories from "./components/Calories";
 import FoodConsumed from "./components/FoodConsumed";
 import PopUp from "./components/PopUp";
-import { addNewFood, addUserFood, fetchAllFoods, fetchUserFoods, deleteUserFood , fetchFoodByID, editUserFood, getCategories, getDefaultCategories,getProdByID, getProducts,getBarCategory,updateCategoryDefault} from "../../firebaseService";
+import { addNewFood, addUserFood, fetchAllFoods, fetchUserFoods, deleteUserFood , fetchFoodByID, editUserFood, getCategories, getDefaultCategories,getProdByID, getProducts,getBarCategory,updateCategoryDefault, getUserDrinks,getUserPlates, getDrinkByID, getPlateByID, getGroupedDrinkTypes} from "../../firebaseService";
 import Filter from "./components/Filter";
 import Loading from "../../components/Loading";
 
 
 function Home() {
     const [foodData, setFoodData] = useState([]); // datos de tabla Food
+    const [platesData, setPlatesData] = useState([]); // datos de tabla Plates
+    const [drinksData, setDrinksData] = useState([]); // datos de tabla Drinks
     const [userFood, setUserFood] = useState([]); // datos de tabla UserFood
     const [date, setDate] = useState(new Date());
     const [amount, setAmount] = useState();
@@ -22,8 +24,10 @@ function Home() {
     const [newFood, setNewFood] = useState();
     const [categories, setCategories]=useState([])
     const [filteredFood, setFilteredFood]=useState([])
+    const [filteredDrinks, setFilteredDrinks] = useState([]); // state for filtered drinks
     const [filterSelected, setFilterSelected]=useState(null)
     const [loading, setLoading] = useState(true);
+    const [groupedDrinks, setGroupedDrinks] = useState([])
 
     useEffect(()=>{
         if(filterSelected) {
@@ -33,6 +37,11 @@ function Home() {
             setFilteredFood(userFood)
         }
     },[filterSelected])
+    const getUserData = async()=> {
+        setPlatesData(await  getUserPlates())
+        setDrinksData (await getUserDrinks())
+    }
+    
     const handleChangesCat = async () => {
         try {
             // Get the foods and bar category
@@ -71,24 +80,32 @@ function Home() {
                 }
                 const userFood = await fetchUserFoods(date);
                 const food = await fetchAllFoods();
-                setFoodData(food);
+                setFoodData(food.sort((a, b) => a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1));
                 
-    
-                // Fetch food details for each user food using Promise.all
                 const userFoodDetails = await Promise.all(userFood.map(async (item) => {
                     let foodDetails;
     
                     // Try fetching from the 'food' table first
                     foodDetails = await fetchFoodByID(item.id_Food);
+
                     
                     // If no details are found in the 'food' table, try the 'menu' table
                     if (!foodDetails) {
-                        foodDetails = await getProdByID(item.id_Food);
-                        console.log(foodDetails.calories)
+                        foodDetails = await getPlateByID(item.id_Food);
+                        console.log(foodDetails)
+                        if(!foodDetails){
+                            foodDetails = await getDrinkByID(item.id_Food);
+                            if(!foodDetails){
+                                foodDetails = await getProdByID(item.id_Food)
+                            }
+                        }
+
+
                     }
                     const calories = foodDetails?.calories_portion !== undefined 
                     ? Math.round(foodDetails?.calories_portion) 
                     : Math.round(foodDetails?.calories || 0);
+
     
                     // Return the item with details or set defaults if not found
                     return {
@@ -118,8 +135,15 @@ function Home() {
         try {
             const cats = await getCategories();
             const defaultCats= await getDefaultCategories();
+            const drinkCats = await getGroupedDrinkTypes();
+            console.log(cats,defaultCats,drinkCats)
             await handleChangesCat()
-            setCategories(defaultCats.concat(cats));
+            const combinedCats = [
+                ...cats, 
+                ...defaultCats,
+                ...drinkCats
+            ];
+            setCategories(combinedCats);
         } catch (err) {
             console.log('Error al obtener las categorias: ' + err);
         }
@@ -131,6 +155,10 @@ function Home() {
         fetchFoods();
         fetchCategories();
     },[date])
+    useEffect(()=>{
+        getUserData()
+        console.log(drinksData, platesData)
+    },[])
 
 
     const handleAddMeal = async () => {
@@ -155,6 +183,7 @@ function Home() {
         })
         
     }, [newFood]);
+    
     const handleDeleteMeal = async (idDoc_user_food) => {
         try {
             await deleteUserFood(idDoc_user_food); // Delete from Firebase backend
@@ -187,12 +216,12 @@ function Home() {
     }
 
     return (
-        <div className="h-screen w-full ">
+        <div className="h-screen w-full overflow-y-hidden">
             <NavBar />
             {loading ? <Loading />
             :
-            <div className="flex flex-col lg:flex-row justify-between items-center w-full lg:h-screen">
-                <div className="w-full sm:w-11/12 lg:w-9/12 sm:h-screen lg:h-full pt-8 sm:pt-24 flex flex-col sm:flex-row justify-start items-start px-1 sm:px-4 lg:px-8">
+            <div className="flex flex-col lg:flex-row justify-between items-center w-full h-full lg:h-screen overflow-y-scroll md:overflow-y-hidden">
+                <div className="w-11/12 lg:w-9/12 sm:h-screen lg:h-full pt-8 sm:pt-24 flex flex-col sm:flex-row justify-start items-start px-1 sm:px-4 lg:px-8 pb-32 xs:pb-0">
                     <div className="w-full sm:w-1/4 pb-4 sm:pb-12 flex flex-col h-full justify-start sm:justify-between items-center">
                         <div className="flex flex-col justify-center items-center md:items-start w-4/5  sm:w-full " >
                             <Calendar value={date} onChange={e => selectDate(e)} />
@@ -200,8 +229,8 @@ function Home() {
                         </div>
                         <Calories userFood={userFood} />
                     </div>
-                    <div className="w-full sm:w-3/4 flex flex-col items-center justify-start pl-0 sm:pl-12">
-                        <div className="flex flex-col w-full">
+                    <div className="w-full sm:w-3/4 flex flex-col items-center justify-start pl-0 sm:pl-12 ">
+                        <div className="flex flex-col w-full ">
                             {filteredFood.map((usfood) => (
                                 <FoodConsumed
                                     key={usfood.id}
@@ -210,15 +239,16 @@ function Home() {
                                     handleEditFoodConsumed={handleEditFoodConsumed}
                                 />
                             ))}
-                            <div className="flex w-full items-center justify-center bg-white sticky bottom-0">
-                                <div onClick={() => setAddMeal(true)} className="flex w-full mb-2 flex-row justify-start items-center py-2 px-4 mt-2 sm:mt-4 rounded-2xl font-semibold text-lg text-darkGray bg-healthyGreen/30 font-quicksand hover:cursor-pointer hover:bg-healthyGreen/50">
-                                    <FontAwesomeIcon icon={faPlus} className="text-darkGray text-xl mr-3" />
-                                    <p>Add food</p>
-                                </div>
-                            </div>
+                            
+                        </div>
+                    </div>
+                    <div className="absolute bottom-0  right-0 flex  items-center justify-center ">
+                        <div onClick={() => setAddMeal(true)} className="  hover:cursor-pointer bg-white rounded-tl-full p-3 flex justify-center items-center">
+                            <FontAwesomeIcon icon={faPlus} className="text-white text-xl xs:text-2xl bg-healthyGreen hover:bg-healthyDarkGreen rounded-full p-3 xs:p-5  shadow-lg ml-3 xs:ml-4 mt-4 xs:mt-6 " />
                         </div>
                     </div>
                 </div>
+                
                 {(window.innerWidth > '1024') && (
                     <div className="w-full lg:w-4/12 lg:h-screen flex justify-start">
                         <img src={bgImage} alt='Bakground image' className="w-full h-full object-cover" />
@@ -226,7 +256,7 @@ function Home() {
                 )}
             </div>}
             {addMeal &&
-                <PopUp setAddMeal={setAddMeal} foodData={foodData} handleAddMeal={handleAddMeal} setNewFood={setNewFood} setSelection={setSelection} selection={selection} />
+                <PopUp newFood={newFood} setAddMeal={setAddMeal} foodData={foodData} handleAddMeal={handleAddMeal} setNewFood={setNewFood} setSelection={setSelection} selection={selection} platesData={platesData} drinksData={drinksData} />
             }
         </div>
     );

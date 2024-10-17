@@ -16,13 +16,13 @@ function EditCategory({setEditCategory, setAddFood, category, icon, food, handle
     const [iconSelected,setIconSelected]=useState(icon)
     const [catFoods, setCatFoods] = useState(category.foods.map((item) => food.find((element) => element.id === item)));
     const [name, setName]=useState(category.name)
+    const [clickable, setClickable] = useState(true);
 
     const handleChanges= async ()=>{
         const data={
             name:name, 
             icon:iconSelected.name,
-            foods: catFoods.map((item) => item.id)
-            .concat(Array.isArray(selection.food) ? selection.food.filter((item) => !catFoods.includes(item)) : [])
+            foods: catFoods.map((items)=>items.id)
         }
         if(data !== category) {
             try{
@@ -37,7 +37,15 @@ function EditCategory({setEditCategory, setAddFood, category, icon, food, handle
         }
         setEditCategory(false)
     }
-
+    const handleSingleClick = () => {
+        if (clickable) {
+            setClickable(false); 
+            handleChanges(); 
+            setTimeout(() => {
+                setClickable(true); 
+            }, 1000); 
+        }
+    };
     const handleIcon=(icon)=>{
         setIconSelected(icon)
         setDropIcons(false)
@@ -80,7 +88,7 @@ function EditCategory({setEditCategory, setAddFood, category, icon, food, handle
                 </div>
             </div>
             <div className='flex w-full justify-center items-center pt-4 pb-2'>
-                <SaveButton handleChanges={handleChanges} label="Save changes"/>
+                <SaveButton handleChanges={handleSingleClick} label="Save changes"/>
             </div>
         </div>
   )
