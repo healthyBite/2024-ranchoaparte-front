@@ -1,22 +1,38 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import FoodItem from './FoodItem';
-import {createplate} from '../../../firebaseService'
-import { uploadImageToStorage } from "../../../firebaseConfig";
-import { faImage } from '@fortawesome/free-solid-svg-icons';
+import {createplate,createReview, fetchUser} from '../../../firebaseService'
+import { uploadImageToStorage, } from "../../../firebaseConfig";
+import { faEye, faEyeSlash, faImage, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { Visibility } from './Visibility';
+import { plateAchivements } from '../../../components/AchivementsValidation'
+
 
 const NewPlate = ({ foodData, setPlates, plates }) => {
   const [plateName, setPlateName] = useState('');
+  const [search, setSearch]=useState('')
+  const [foods, setFoods]=useState(foodData)
   const [selectedFoods, setSelectedFoods] = useState([]);
   const [message, setMessage] = useState(''); // State for success message
   const [reset, setReset] = useState(false); // State to trigger reset in FoodItem
   const [plateFoodIds, setPlateFoodIds] = useState([]); // State for storing plate food IDs
   const [image, setImage] = useState(null);
   const fileInputRef = useRef(null);
+  const [publicPlate, setPublicPlate]=useState(false)
+
   // Function to handle adding/removing food items
   const handleImageChange = (e) => {
     setImage(e.target.files[0]);
   };
+
+  useEffect(()=>{
+    if(search===''){
+      const showFood=selectedFoods.concat(foodData.filter(item=>!(selectedFoods.map(e=>e.id)).includes(item.id)))
+      setFoods(showFood)
+    }else{
+      setFoods(foodData.filter((item)=>item.name.toLowerCase().startsWith(search.toLowerCase())))
+    }
+  },[search])
   
   const handleFoodChange = (food, quantity ) => {
     if (quantity > 0) {
@@ -29,11 +45,21 @@ const NewPlate = ({ foodData, setPlates, plates }) => {
   };
 
   // Function to calculate total calories
-  const calculateTotalCalories = () => {
-    return selectedFoods.reduce((total, food) => {
-      return total + (food.quantity * food.calories_portion) / food.measure_portion;
-    }, 0);
+  const calculateTotalNutrients = () => {
+    return selectedFoods.reduce(
+      (totals, food) => {
+        const quantityFactor = food.quantity / food.measure_portion;
+        totals.calories += food.calories_portion * quantityFactor;
+        totals.sodium += food.sodium_portion * quantityFactor;
+        totals.fats += food.fats_portion * quantityFactor;
+        totals.carbohydrates += food.carbohydrates_portion * quantityFactor;
+        totals.protein += food.protein_portion * quantityFactor;
+        return totals;
+      },
+      { calories: 0, sodium: 0, fats: 0, carbohydrates: 0, protein: 0 }
+    );
   };
+
   const ingredientsArray = selectedFoods.map(food => ({
     ingredientId: food.id,
     quantity: food.quantity
@@ -50,13 +76,14 @@ const createPlate = async () => {
   }
 
   try {
+    const user= await fetchUser()
+    console.log("LEVEL", user.validation)
     let imageUrl = "";
     if (image) {
       // Upload the image and get the URL
       imageUrl = await uploadImageToStorage(image);
     }
-
-    const totalCalories = calculateTotalCalories();
+    const totals = calculateTotalNutrients();
     const ingredientsArray = selectedFoods.map((food) => ({
       ingredientId: food.id,
       quantity: food.quantity,
@@ -65,20 +92,32 @@ const createPlate = async () => {
     const data = {
       name: plateName,
       ingredients: ingredientsArray,
-      total_cal: totalCalories,
-      image: imageUrl, // Add the image URL to the plate data
+      calories_portion: totals.calories,
+      image: imageUrl,
+      public: publicPlate,
+      sodium_portion: totals.sodium,
+      fats_portion: totals.fats,
+      carbohydrates_portion: totals.carbohydrates,
+      protein_portion: totals.protein,
+      verified: user.validation,
     };
 
     // Update the UI without refreshing the page
-    const newPlates=plates.concat({ name: plateName, ingredients: ingredientsArray, calories_portion: totalCalories, image: imageUrl })
-    console.log('ASI QUEDARIA LOS NUEVOS PLATOS ', newPlates)
+    const newPlates=plates.concat({ name: plateName, ingredients: ingredientsArray, calories_portion: totals.calories, sodium_portion: totals.sodium, carbohydrates_portion: totals.carbohydrates, protein_portion: totals.protein, fats_portion:  totals.fats, image: imageUrl,public:publicPlate,verified: user.validation  })
+    plateAchivements(newPlates.length)
     setPlates(newPlates);
 
-    await createplate(data);
+    const plate_id= await createplate(data);
+    if(data.public == true){
+      await createReviewForPublicPlate(plate_id)
+    }
+
 
     // Clear form inputs and display success message
     setMessage("Your Plate is created!");
     setPlateName("");
+    setPublicPlate(false)
+    setSearch('')
     setSelectedFoods([]);
     setImage(null); // Clear the selected image
     setReset(true);
@@ -90,6 +129,21 @@ const createPlate = async () => {
     setMessage("An error occurred while creating the plate.");
   }
 };
+const createReviewForPublicPlate = async (plate_id) => {
+  const review = {
+      id_plate: plate_id,
+      comments: [],
+      score: 0
+  };
+  try {
+      // Assume createReviewAPI is the function that saves the review to Firebase
+      await createReview(review);
+      console.log("Review created successfully!");
+  } catch (error) {
+      console.error("Error creating review:", error);
+  }
+};
+
 
 const savePlate = async () => {
   await createPlate();
@@ -111,12 +165,13 @@ const savePlate = async () => {
       <div className="flex md:sticky md:top-0 py-2 w-full justify-center items-center text-healthyDarkGreen bg-white">
         <div className='flex w-full items-center justify-around'>
           <input
-            className="text-sm font-semibold bg-healthyGray p-1 text-healthyDarkGreen focus:outline-none rounded-lg text-center w-10/12 focus:ring-healthyGreen"
+            className="text-sm font-semibold bg-healthyGray p-1 text-healthyDarkGreen focus:outline-none rounded-lg text-center w-10/12 focus:ring-healthyGreen ml-2"
             type="text"
             placeholder="Plate name"
             value={plateName}
             onChange={(e) => setPlateName(e.target.value)}
           />
+          <Visibility publicPlate={publicPlate} setPublicPlate={setPublicPlate}/>
           <input
             type="file"
             ref={fileInputRef}
@@ -128,15 +183,16 @@ const savePlate = async () => {
             <FontAwesomeIcon icon={faImage} className='text-2xl' /> {/* Cambia el tamaño según tus necesidades */}
           </button>
         </div>
-
-          
         </div>
       {message && (
         <p className="text-white bg-healthyGreen px-2 py-1 rounded-full text-sm text-center font-semibold mt-2">{message}</p>
       )}
-
+      <div className='flex w-11/12 my-2  rounded-full items-center justify-between py-1 px-2  bg-healthyGray  text-sm '>
+        <input onChange={(e)=>setSearch(e.target.value)} type='text' placeholder='Search food...' className='font-quicksand font-semibold px-1 focus:outline-none text-healthyGray1 w-full bg-healthyGray ' />
+        <FontAwesomeIcon icon={faMagnifyingGlass} className='text-lg text-healthyGray1 px-1'/>
+      </div>
       <div className="font-quicksand text-sm text-healthyGreen px-2 w-full">
-        {foodData.map((food) => (
+        {foods.map((food) => (
           <FoodItem
             key={food.id}
             food={food}

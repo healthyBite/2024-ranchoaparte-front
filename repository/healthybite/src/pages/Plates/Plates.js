@@ -7,11 +7,13 @@ import { PlateItem } from './components/PlateItem'
 import { fetchAllFoods } from '../../firebaseService'
 import Loading from '../../components/Loading'
 import NewPlate from './components/NewPlate'
-import {getUserPlates} from '../../firebaseService'
+import {getUserPlates,getUserNotification,markNotificationAsRead} from '../../firebaseService'
 import { auth } from "../../firebaseConfig";
 import emptyPlate from '../../assets/emptyPlate.png'
 import PopUpPlate from './components/PopUpPlates'
 import { PickersSectionListSectionContent } from '@mui/x-date-pickers/PickersSectionList/PickersSectionList'
+import { plateAchivements } from '../../components/AchivementsValidation'
+import NotificationPopup from '../../components/NotificationPopup';
 
 export const Plates = () => {
     const [addFood, setAddFood]=useState(false)
@@ -23,37 +25,52 @@ export const Plates = () => {
     const [newPlate, setNewPlate]=useState(false)
     const [successMessage, setSuccessMessage] = useState('');
     const [selection , setSelection]=useState(null)
+    const [notifications, setNotifications] = useState([]);
 
     const fetchPlates = async () => {
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
-            if (user) {
                 try {
                     const plates = await getUserPlates();
                     setPlates(plates);
+                    plateAchivements(plates.length)
+                    setLoading(false)
+                    
+
                 } catch (err) {
                     console.log('Error al obtener las platos: ' + err);
                 }
-            }else{
-                console.log('No user is signed in');
-            }
+            
             
         })
         return () => unsubscribe();
+    };
+    const fetchUserNotifications=async ()=>{
+        const fetchedNotifications = await getUserNotification();
+        setNotifications(fetchedNotifications || []);
+    }
+    const handleDismissNotification = async (notificationId) => {
+        try {
+            await markNotificationAsRead(notificationId);
+            setNotifications(notifications.filter(notif => notif.id !== notificationId));
+        } catch (err) {
+            console.error("Error dismissing notification:", err);
+        }
     };
 
     const fetchFood=async ()=>{
         try {
             const food=await fetchAllFoods()
             setFoodData(food.sort((a, b) => a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1))
-            setLoading(false)
+            fetchPlates()
         }catch (e){
             console.log("Error fetching food data on Plate page ", e)
         }
     }
     const handleupdatePlates = ()=>{
         setLoading(true)
-        const platesRecorded=fetchPlates()
-        foodData.length>0 && platesRecorded && setLoading(false)
+        fetchPlates()
+        fetchUserNotifications()
+        plateAchivements(plates.length)
     }
 
     useEffect(()=>{
@@ -65,8 +82,8 @@ export const Plates = () => {
 
     useEffect(()=>{
         setLoading(true)
-        const platesRecorded=fetchPlates()
-        const foodRecorded=fetchFood()
+        fetchFood()
+        fetchUserNotifications();
     },[])
 
   return (
@@ -85,20 +102,20 @@ export const Plates = () => {
                         <div className='flex md:h-full flex-col lg:mr-10 w-10/12 md:w-3/5 lg:w-2/4  ' >
                             <div className='flex flex-row justify-start md:justify-start items-center w-full '>
                                 <p className='text-healthyDarkGray1 font-belleza text-3xl  '>My plates</p>
-
+                                {successMessage && (
+                                    <div className='bg-healthyGreen text-white font-bold text-sm text center rounded-full shadow-sm mx-3 px-3 py-1  font-quicksand '>
+                                        {successMessage}
+                                    </div>
+                                )}
                             </div>
                             <div className='flex flex-col  font-quicksand text-darkGray items-start w-full lg:ml-12 '>
 
                                 
                             {plates && plates.length > 0 ?
                             <div className='flex flex-col w-full md:w-11/12 justify-start items-start mt-8 md:max-h-[400px] md:overflow-y-auto'>
-                                        {successMessage && (
-                                        <div className='text-healthyGreen mt-2  font-quicksand'>
-                                            {successMessage}
-                                        </div>
-                                    )}
+                                        
                                 {plates.map((plate, index) => (
-                                    <PlateItem plate={plate} key={index} foodData={foodData} handleupdatePlates={handleupdatePlates} setSuccessMessage={setSuccessMessage} setAddFood={setAddFood} setPlate={setPlate} selection={selection} />
+                                    <PlateItem plateDetail={plate} key={index} foodData={foodData} handleupdatePlates={handleupdatePlates} setSuccessMessage={setSuccessMessage} setAddFood={setAddFood} setPlate={setPlate} selection={selection} />
                                 ))}
                             </div>
                             :
@@ -114,6 +131,12 @@ export const Plates = () => {
                         </div>
                     </div>
                 </div>
+                {notifications.length > 0 && (
+                        <NotificationPopup
+                            notifications={notifications}
+                            onDismiss={handleDismissNotification}
+                        />
+                    )}
                 
 
             </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCirclePlus } from '@fortawesome/free-solid-svg-icons';
 
-const FoodItem = ({ food, setSelection }) => {
+const FoodItem = ({ food, setSelection, publicPlates }) => {
     const [amount, setAmount] = useState('');
     const [errorMessage, setErrorMessage] = useState(''); // State to track error message
     const handleAmountChange = (e) => {
@@ -16,7 +16,7 @@ const FoodItem = ({ food, setSelection }) => {
 
     const handleAddFood = () => {
         if (amount > 0) { // Ensure amount is greater than 0
-            setSelection({ id_food: food.id, name: food.name, amount, measure: food.measure });
+            setSelection({ id_food: food.id, name: food.name, amount, measure: food.measure, carbohydrates_portion: food.carbohydrates_portion,fats_portion: food.fats_portion, protein_portion: food.protein_portion, sodium_portion: food.sodium_portion});
         } else {
             setErrorMessage("Please enter a valid amount greater than 0.");
         }
@@ -24,7 +24,7 @@ const FoodItem = ({ food, setSelection }) => {
 
 
     return (
-        <div key={food.id} className="flex flex-col font-quicksand bg-white/60 p-2 rounded-lg mb-2">
+        <div key={food.id} className={`flex flex-col font-quicksand ${publicPlates ? 'bg-healthyGreen/30 ':'bg-white/60'} p-2 rounded-lg mb-2`}>
             <div className="flex flex-row items-center justify-between">
                 <div className="flex flex-row justify-start items-center">
                     <FontAwesomeIcon 
@@ -45,7 +45,7 @@ const FoodItem = ({ food, setSelection }) => {
                         />
                     </div>
                     <div className='flex items-center justify-start w-[60px]'>
-                        <p className='text-xs sm:text-md'>{food.measure}</p>
+                        <p className='text-xs sm:text-md'>{food.measure ? food.measure : 'plate'}</p>
                     </div>
                 </div>
             </div>
